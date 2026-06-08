@@ -101,7 +101,7 @@ export default function ShopifyAppsTracker() {
   const [pwError, setPwError]             = useState(false);
   const [pwAction, setPwAction]           = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
-  const [editPassword]                    = useState("sii2026");
+  const [editPassword]                    = useState("sl2026");
   const [editId, setEditId]               = useState(null);
   const [syncStatus, setSyncStatus]       = useState("");
   const [form, setForm]                   = useState(EMPTY_FORM);
