@@ -78,7 +78,7 @@ const EMPTY_FORM = {
   name: "", url: "", description: "",
   categories: ["Other"],
   customCategory: "",
-  billing: "monthly", amount: "", currency: "USD",
+  billing: "monthly", amount: "", currency: "PHP",
   status: "Active",
   customStatus: "",
   endDate: "",
@@ -284,7 +284,7 @@ export default function ShopifyAppsTracker() {
       name: t.name, url: t.url || "", description: t.description || "",
       categories: t.categories || ["Other"],
       customCategory: "",
-      billing: t.billing, amount: t.amount, currency: t.currency || "USD",
+      billing: t.billing, amount: t.amount, currency: t.currency || "PHP",
       status: t.status || "Active",
       customStatus: "",
       endDate: t.endDate || "",
@@ -298,18 +298,15 @@ export default function ShopifyAppsTracker() {
     setAdding(false);
   };
 
-  // Cost helpers — USD base, PHP display
-  const RATES = { PHP: 1 / 56, USD: 1, EUR: 1.09, GBP: 1.27 };
-  const toUSD = (amount, currency) => (parseFloat(amount) || 0) * (RATES[currency] || 1);
-  const toMonthlyUSD = t => { const a = toUSD(t.amount, t.currency); return t.billing === "annual" ? a / 12 : t.billing === "monthly" ? a : 0; };
-  const toAnnualUSD  = t => { const a = toUSD(t.amount, t.currency); return t.billing === "monthly" ? a * 12 : t.billing === "annual" ? a : 0; };
+  // Cost helpers — always convert to PHP for totals (matches AI tracker)
+  const RATES = { PHP: 1, USD: 56, EUR: 61, GBP: 72 };
+  const toPHP = (amount, currency) => (parseFloat(amount) || 0) * (RATES[currency] || 1);
+  const toMonthlyUSD = t => { const a = toPHP(t.amount, t.currency); return t.billing === "annual" ? a / 12 : t.billing === "monthly" ? a : 0; };
+  const toAnnualUSD  = t => { const a = toPHP(t.amount, t.currency); return t.billing === "monthly" ? a * 12 : t.billing === "annual" ? a : 0; };
   const totalMonthly = apps.filter(a => a.status === "Active" || a.status === "Trial").reduce((s, t) => s + toMonthlyUSD(t), 0);
   const totalAnnual  = apps.filter(a => a.status === "Active" || a.status === "Trial").reduce((s, t) => s + toAnnualUSD(t), 0);
-  const fmtUSD = (n) => `$${(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const fmtAmt = (amount, currency) => {
-    const sym = currency === "USD" ? "$" : currency === "PHP" ? "₱" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency + " ";
-    return sym + (parseFloat(amount) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  const fmt = (n, cur) => { const sym = cur === "PHP" ? "₱" : cur === "USD" ? "$" : cur === "EUR" ? "€" : cur + " "; return sym + (n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  const fmtAmt = (amount, currency) => fmt(parseFloat(amount) || 0, currency);
 
   const byCat = {};
   apps.filter(a => a.status === "Active" || a.status === "Trial").forEach(t => {
@@ -366,8 +363,8 @@ export default function ShopifyAppsTracker() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, maxWidth: 500 }}>
             {[
               { label: "Installed Apps", value: apps.length },
-              { label: "Monthly Cost (Active)", value: fmtUSD(totalMonthly) },
-              { label: "Annual Cost (Active)", value: fmtUSD(totalAnnual) }
+              { label: "Monthly Cost (Active)", value: fmt(totalMonthly) },
+              { label: "Annual Cost (Active)", value: fmt(totalAnnual) }
             ].map(s => (
               <div key={s.label} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 8, padding: "10px 16px" }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "'Sora',sans-serif" }}>{s.value}</div>
@@ -493,17 +490,17 @@ export default function ShopifyAppsTracker() {
                 <label style={lbl}>Currency</label>
                 <select style={inp} value={form.currency} onChange={e => {
                   const newCur = e.target.value;
-                  const rates = { PHP: 1 / 56, USD: 1, EUR: 1.09, GBP: 1.27 };
+                  const rates = { PHP: 1, USD: 56, EUR: 61, GBP: 72 };
                   const amt = parseFloat(form.amount) || 0;
                   if (amt > 0 && form.currency !== newCur) {
-                    const inUSD = amt * (rates[form.currency] || 1);
-                    const converted = (inUSD / (rates[newCur] || 1)).toFixed(2);
+                    const inPHP = amt * (rates[form.currency] || 1);
+                    const converted = (inPHP / (rates[newCur] || 1)).toFixed(2);
                     setForm(f => ({ ...f, currency: newCur, amount: converted }));
                   } else {
                     setForm(f => ({ ...f, currency: newCur }));
                   }
                 }}>
-                  {["USD", "PHP", "EUR", "GBP"].map(cur => <option key={cur}>{cur}</option>)}
+                  {["PHP", "USD", "EUR", "GBP"].map(cur => <option key={cur}>{cur}</option>)}
                 </select>
               </div>
               <div>
@@ -698,7 +695,7 @@ export default function ShopifyAppsTracker() {
                                   {t.billing === "free" ? "Free" : t.amount ? fmtAmt(t.amount, t.currency || "USD") + billingLabel : "—"}
                                 </div>
                                 {t.billing !== "free" && monthlyUSD > 0 && t.billing === "annual" && (
-                                  <div style={{ fontSize: 10, color: "#94a3b8" }}>{fmtUSD(monthlyUSD)}/mo equiv.</div>
+                                  <div style={{ fontSize: 10, color: "#94a3b8" }}>{fmt(monthlyUSD)}/mo equiv.</div>
                                 )}
                                 <div style={{ display: "flex", gap: 6, marginTop: 10, justifyContent: "flex-end" }}>
                                   <button onClick={() => moveApp(t.id, -1)} style={{ background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 5, padding: "4px 8px", cursor: "pointer", fontSize: 11, color: "#64748b" }}>↑</button>
@@ -781,7 +778,7 @@ export default function ShopifyAppsTracker() {
                                 <div>
                                   <label style={lbl}>Currency</label>
                                   <select style={inp} defaultValue={t.currency || "USD"} id={`edit-currency-${t.id}`}>
-                                    {["USD", "PHP", "EUR", "GBP"].map(cur => <option key={cur}>{cur}</option>)}
+                                    {["PHP", "USD", "EUR", "GBP"].map(cur => <option key={cur}>{cur}</option>)}
                                   </select>
                                 </div>
                                 <div>
@@ -868,7 +865,7 @@ export default function ShopifyAppsTracker() {
                           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", padding: "2px 8px", borderRadius: 3, background: "rgba(255,255,255,0.2)", color: "#fff" }}>{cat}</span>
                           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.75)" }}>{count} app{count > 1 ? "s" : ""}</span>
                         </div>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", fontFamily: "'Sora',sans-serif" }}>{fmtUSD(monthly)}/mo</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", fontFamily: "'Sora',sans-serif" }}>{fmt(monthly)}/mo</span>
                       </div>
                       <div style={{ height: 4, background: "rgba(255,255,255,0.2)", borderRadius: 2 }}>
                         <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.8)", width: `${pct}%`, transition: "width 0.4s ease" }} />
@@ -880,8 +877,8 @@ export default function ShopifyAppsTracker() {
               <div style={{ borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 18, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
                 {[
                   { label: "Total Apps", value: apps.length },
-                  { label: "Monthly (Active)", value: fmtUSD(totalMonthly) },
-                  { label: "Annual (Active)", value: fmtUSD(totalAnnual) }
+                  { label: "Monthly (Active)", value: fmt(totalMonthly) },
+                  { label: "Annual (Active)", value: fmt(totalAnnual) }
                 ].map(s => (
                   <div key={s.label} style={{ textAlign: "center" }}>
                     <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 22, fontWeight: 700, color: "#fff" }}>{s.value}</div>
